@@ -28,15 +28,17 @@ def run_git_command(args: list[str]) -> str:
     return result.stdout
 
 
-def get_diff(staged_only: bool) -> str:
-    """Return staged-only diff or full diff (staged + unstaged)."""
-    if staged_only:
-        return run_git_command(["diff", "--staged"])
+def run_git_command_stream(args: list[str]) -> None:
+    """Run a git command streaming stdout/stderr to the terminal."""
+    try:
+        subprocess.run(["git", *args], check=True)
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(f"git {' '.join(args)} failed with exit code {exc.returncode}") from exc
 
-    staged = run_git_command(["diff", "--staged"])
-    unstaged = run_git_command(["diff"])
-    combined = "\n".join(part for part in (staged, unstaged) if part.strip())
-    return combined.strip()
+
+def get_diff() -> str:
+    """Return staged-only diff or full diff (staged + unstaged)."""
+    return run_git_command(["diff", "--staged"])
 
 
 def load_prompt(path: Path) -> str:
@@ -110,11 +112,6 @@ def parse_args() -> argparse.Namespace:
         description="Suggest a commit message based on git diff.",
     )
     parser.add_argument(
-        "--staged-only",
-        action="store_true",
-        help="Analyze staged changes only.",
-    )
-    parser.add_argument(
         "--model",
         default="gpt-4o-mini",
         help="OpenAI model used by the SDK (default: gpt-4o-mini).",
@@ -125,12 +122,18 @@ def parse_args() -> argparse.Namespace:
         default=0.0,
         help="Model temperature (default: 0.0).",
     )
-    parser.add_argument(
-        "--no-fallback",
-        action="store_true",
-        help="Fail if LLM cannot be used, instead of using local heuristic fallback.",
-    )
     return parser.parse_args()
+
+
+def ask_to_apply_commit(suggestion: str) -> bool:
+    print(f"Suggested commit message:\n{suggestion}\n")
+    prompt = "Do you want to apply this message and run git commit for staged changes? [y/N]: "
+    answer = input(prompt).strip().lower()
+    return answer in {"y", "yes"}
+
+
+def apply_commit(suggestion: str) -> None:
+    run_git_command_stream(["commit", "-m", suggestion])
 
 
 def main() -> int:
@@ -143,7 +146,7 @@ def main() -> int:
     args = parse_args()
 
     try:
-        diff = get_diff(staged_only=args.staged_only)
+        diff = get_diff()
     except RuntimeError as exc:
         print(f"Error reading diff: {exc}", file=sys.stderr)
         return 1
@@ -162,7 +165,17 @@ def main() -> int:
             return 1
         suggestion = fallback_suggestion(diff)
 
-    print(suggestion)
+    if not ask_to_apply_commit(suggestion=suggestion):
+        print("Commit canceled by user.")
+        return 0
+
+    try:
+        apply_commit(suggestion=suggestion)
+    except RuntimeError as exc:
+        print(f"Failed to commit changes: {exc}", file=sys.stderr)
+        return 1
+
+    print("Commit created successfully.")
     return 0
 
 
