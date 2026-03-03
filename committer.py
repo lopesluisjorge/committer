@@ -33,7 +33,8 @@ def run_git_command_stream(args: list[str]) -> None:
     try:
         subprocess.run(["git", *args], check=True)
     except subprocess.CalledProcessError as exc:
-        raise RuntimeError(f"git {' '.join(args)} failed with exit code {exc.returncode}") from exc
+        raise RuntimeError(
+            f"git {' '.join(args)} failed with exit code {exc.returncode}") from exc
 
 
 def get_diff() -> str:
@@ -45,7 +46,8 @@ def load_prompt(path: Path) -> str:
     try:
         return path.read_text(encoding="utf-8").strip()
     except OSError as exc:
-        raise RuntimeError(f"Could not read prompt file at {path}: {exc}") from exc
+        raise RuntimeError(
+            f"Could not read prompt file at {path}: {exc}") from exc
 
 
 def build_prompt(diff: str) -> tuple[str, str]:
@@ -90,20 +92,6 @@ def suggest_with_llm(diff: str, model: str, temperature: float) -> str:
     if not suggestion:
         raise RuntimeError("The model did not return a suggestion.")
     return suggestion
-
-
-def fallback_suggestion(diff: str) -> str:
-    """Simple heuristic fallback when LLM is unavailable."""
-    lower = diff.lower()
-    if "readme" in lower or "docs/" in lower:
-        return "docs: update documentation"
-    if "test" in lower:
-        return "test: improve test coverage"
-    if "requirements" in lower or "poetry.lock" in lower or "package-lock" in lower:
-        return "chore: update dependencies"
-    if "fix" in lower or "bug" in lower:
-        return "fix: correct behavior"
-    return "chore: update code"
 
 
 def parse_args() -> argparse.Namespace:
@@ -161,9 +149,9 @@ def main() -> int:
         )
     except RuntimeError as exc:
         if args.no_fallback:
-            print(f"Failed to generate suggestion with LLM: {exc}", file=sys.stderr)
+            print(
+                f"Failed to generate suggestion with LLM: {exc}", file=sys.stderr)
             return 1
-        suggestion = fallback_suggestion(diff)
 
     if not ask_to_apply_commit(suggestion=suggestion):
         print("Commit canceled by user.")
