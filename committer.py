@@ -57,24 +57,34 @@ def build_prompt(diff: str) -> tuple[str, str]:
 
 def suggest_with_llm(diff: str, model: str, temperature: float) -> str:
     try:
-        from langchain_core.messages import HumanMessage, SystemMessage
-        from langchain_openai import ChatOpenAI
+        from openai import OpenAI
     except ImportError as exc:
         raise RuntimeError(
-            "LangChain dependencies are not installed. Run: pip install -r requirements.txt"
+            "OpenAI SDK is not installed. Run: pip install -r requirements.txt"
         ) from exc
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY was not found in the environment.")
 
-    llm = ChatOpenAI(model=model, temperature=temperature, api_key=api_key)
     system_content, user_content = build_prompt(diff)
-    response = llm.invoke(
-        [SystemMessage(content=system_content),
-         HumanMessage(content=user_content)]
-    )
-    suggestion = (response.content or "").strip()
+    client = OpenAI(api_key=api_key)
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            temperature=temperature,
+            messages=[
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": user_content},
+            ],
+        )
+    except Exception as exc:
+        raise RuntimeError(f"OpenAI request failed: {exc}") from exc
+
+    suggestion = ""
+    if response.choices:
+        suggestion = (response.choices[0].message.content or "").strip()
     if not suggestion:
         raise RuntimeError("The model did not return a suggestion.")
     return suggestion
@@ -107,7 +117,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         default="gpt-4o-mini",
-        help="OpenAI model used by LangChain (default: gpt-4o-mini).",
+        help="OpenAI model used by the SDK (default: gpt-4o-mini).",
     )
     parser.add_argument(
         "--temperature",
