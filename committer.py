@@ -121,7 +121,16 @@ def ask_to_apply_commit(suggestion: str) -> bool:
 
 
 def apply_commit(suggestion: str) -> None:
-    run_git_command_stream(["commit", "-m", suggestion])
+    try:
+        subprocess.run(
+            ["git", "commit", "-F", "-"],
+            input=suggestion,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(
+            f"git commit failed with exit code {exc.returncode}") from exc
 
 
 def main() -> int:
