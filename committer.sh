@@ -2,7 +2,7 @@
 # CLI to suggest commit messages based on local changes.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 PROMPTS_DIR="$SCRIPT_DIR/prompts"
 SYSTEM_PROMPT_FILE="$PROMPTS_DIR/system.txt"
 USER_PROMPT_FILE="$PROMPTS_DIR/user.txt"
